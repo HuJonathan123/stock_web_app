@@ -4,129 +4,143 @@ import json
 import os
 import datetime
 
-# 設定頁面
+# ==========================================
+# 1. 頁面基礎設定
+# ==========================================
 st.set_page_config(page_title="AI 投資戰情室", layout="wide", page_icon="📈")
 st.title("📈 Jonathan's AI Investment Dashboard")
 
-# 建立分頁
-tab1, tab2, tab3 = st.tabs(["🦅 禿鷹策略 (自動)", "🤖 實驗室模型", "✍️ 手動交易日記"])
+# 建立四個分頁
+tab1, tab2, tab3, tab4 = st.tabs(["🦅 禿鷹 (All-in)", "🐙 章魚 (分散)", "🤖 實驗室", "✍️ 手動日記"])
 
-# 🔥🔥🔥【修正核心：使用絕對路徑】🔥🔥🔥
-# 1. 抓出 app.py 所在的絕對位置
+# ==========================================
+# 2. 路徑設定 (使用絕對路徑防止雲端錯誤)
+# ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 2. 設定 data 資料夾的絕對路徑
 DATA_DIR = os.path.join(BASE_DIR, "data")
-PORTFOLIO_FILE = os.path.join(DATA_DIR, "portfolio.json")
-LOG_FILE = os.path.join(DATA_DIR, "trade_log.csv")
-MANUAL_LOG_FILE = os.path.join(DATA_DIR, "manual_log.csv")
-BALANCE_FILE = os.path.join(DATA_DIR, "balance_history.csv")
 
-# 3. 強制建立資料夾 (如果不存在)
+# 強制建立 data 資料夾 (如果不存在)
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
-# 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 
 # ==========================================
-# Tab 1: 禿鷹策略 (自動化)
+# 3. 核心函數：顯示策略頁面
 # ==========================================
-with tab1:
-    st.header("🦅 Vulture Strategy (自動化監控)")
+def show_strategy_tab(strategy_name, title_text):
+    """
+    通用函數：讀取並顯示某個策略的數據
+    strategy_name: 'vulture' 或 'octopus' (對應檔案前綴)
+    title_text: 顯示在網頁上的標題
+    """
+    # 定義檔案路徑
+    portfolio_file = os.path.join(DATA_DIR, f"{strategy_name}_portfolio.json")
+    log_file = os.path.join(DATA_DIR, f"{strategy_name}_log.csv")
+    balance_file = os.path.join(DATA_DIR, f"{strategy_name}_balance.csv")
+
+    st.header(title_text)
     
-    # 初始化預設值 (防止檔案讀取失敗)
-    portfolio = {"cash": 1000, "holdings": None, "last_update": "尚未更新"}
-    
-    # 嘗試讀取檔案
-    if os.path.exists(PORTFOLIO_FILE):
+    # --- 讀取 Portfolio (持倉狀態) ---
+    portfolio = {"cash": 1000, "holdings": [], "last_update": "尚未初始化"}
+    if os.path.exists(portfolio_file):
         try:
-            with open(PORTFOLIO_FILE, 'r') as f:
-                # 檢查檔案是否為空
-                if os.stat(PORTFOLIO_FILE).st_size > 0:
+            with open(portfolio_file, 'r') as f:
+                if os.stat(portfolio_file).st_size > 0:
                     portfolio = json.load(f)
         except json.JSONDecodeError:
-            st.warning("⚠️ 投資組合檔案 (portfolio.json) 格式錯誤或為空，已使用預設值。")
-    
-    # 顯示指標卡片
+            st.warning(f"⚠️ {strategy_name}_portfolio.json 格式錯誤，使用預設值。")
+
+    # --- 顯示上方三張卡片 (Metrics) ---
     col1, col2, col3 = st.columns(3)
     
+    # 處理持倉顯示文字
+    holdings = portfolio.get('holdings', [])
     status_text = "無 (空手)"
-    if portfolio.get('holdings'): # 使用 .get 防止 KeyError
-        h = portfolio['holdings']
-        status_text = f"{h['Ticker']} ({h['Shares']:.2f} 股)"
     
+    if isinstance(holdings, list) and len(holdings) > 0:
+        # 如果是列表 (章魚策略)
+        tickers = [h['Ticker'] for h in holdings]
+        status_text = f"持有 {len(holdings)} 檔 ({', '.join(tickers)})"
+    elif isinstance(holdings, dict):
+        # 如果是單一字典 (舊版禿鷹策略兼容)
+        status_text = f"{holdings['Ticker']} ({holdings.get('Shares', 0):.2f} 股)"
+        
     col1.metric("當前持倉", status_text)
-    col2.metric("可用現金", f"${portfolio['cash']:.2f}")
-    col3.metric("最後更新", portfolio.get('last_update', '未知'))
+    col2.metric("可用現金", f"${portfolio.get('cash', 0):.2f}")
+    col3.metric("最後更新", portfolio.get('last_update', 'N/A'))
 
-    # 1. 顯示交易紀錄 (讀取 trade_log.csv)
-    if os.path.exists(LOG_FILE):
-        df_log = pd.read_csv(LOG_FILE)
-        if not df_log.empty:
-            # 🔥 修改這裡：把日期文字改成 2025-01-01
-            st.subheader("📜 歷史交易 (自 2025-01-01 起)") 
-            
-            st.dataframe(
-                df_log.sort_index(ascending=False), 
-                use_container_width=True,
-                column_config={
-                    "Price": st.column_config.NumberColumn(format="$%.2f"),
-                    # Balance 欄位在表格裡顯示的是當時的餘額，沒問題
-                }
-            )
-    
-    # 2. 顯示資產成長曲線 (🔥 修改這裡：讀取 balance_history.csv)
-    if os.path.exists(BALANCE_FILE):
-        df_bal = pd.read_csv(BALANCE_FILE)
+    # --- 顯示資產曲線圖 ---
+    if os.path.exists(balance_file):
+        df_bal = pd.read_csv(balance_file)
         if not df_bal.empty:
             st.subheader("📈 資產成長曲線 (含未實現損益)")
             
-            # 處理數據給圖表
+            # 數據處理
             chart_data = df_bal.copy()
             chart_data['Date'] = pd.to_datetime(chart_data['Date'])
             chart_data = chart_data.set_index('Date')
             
-            # 畫圖
-            st.line_chart(chart_data['Equity'])
-            
-            # 顯示最新淨值
+            # 計算報酬率
             latest_val = df_bal.iloc[-1]['Equity']
             roi = (latest_val - 1000) / 1000 * 100
             
             color = "green" if roi >= 0 else "red"
-            st.markdown(f"### 目前總資產淨值: **${latest_val:,.2f}** (:{color}[{roi:.2f}%])")
-
+            st.markdown(f"#### 目前總資產淨值: **${latest_val:,.2f}** (:{color}[{roi:.2f}%])")
+            
+            st.line_chart(chart_data['Equity'])
     else:
-        st.info("暫無資產數據。")
+        st.info("暫無資產數據 (請在本機執行 run_backtest.py 生成)。")
 
-    st.markdown("---")
-    st.caption("策略邏輯：本金 $1000 | 每次手續費 $2 | RSI < 30 買入 | 獲利 > 20% 賣出")
+    # --- 顯示交易紀錄表格 ---
+    if os.path.exists(log_file):
+        df_log = pd.read_csv(log_file)
+        if not df_log.empty:
+            st.subheader(f"📜 歷史交易紀錄")
+            st.dataframe(
+                df_log.sort_index(ascending=False),
+                use_container_width=True,
+                column_config={
+                    "Price": st.column_config.NumberColumn(format="$%.2f"),
+                    "Balance": st.column_config.NumberColumn(format="$%.2f"),
+                }
+            )
+    else:
+        st.info("暫無交易紀錄。")
 
 # ==========================================
-# Tab 2: 其他模型 (預留空間)
+# Tab 1: 禿鷹策略 (All-in)
+# ==========================================
+with tab1:
+    show_strategy_tab("vulture", "🦅 Vulture Strategy (單押 All-in)")
+    st.markdown("---")
+    st.caption("策略邏輯：本金 $1000 | 1 份資金 | 20% 獲利賣出 | 15 天持有上限")
+
+# ==========================================
+# Tab 2: 章魚策略 (分散)
 # ==========================================
 with tab2:
-    st.header("🤖 Alpha 實驗室")
-    st.write("這裡可以放置你的 Transformer 模型預測結果、回測數據，或是瘋狗流策略的監控。")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info("Transformer 預測 (開發中)")
-        st.write("今日最強預測：NVDA (+1.2%)")
-    with col2:
-        st.warning("瘋狗流策略 (開發中)")
-        st.write("今日訊號：無 (VIX 過高)")
+    show_strategy_tab("octopus", "🐙 Octopus Strategy (分散佈局)")
+    st.markdown("---")
+    st.caption("策略邏輯：本金 $1000 | 3 份資金 | 10% 動態止盈 | 弱勢股 7 天砍倉")
 
 # ==========================================
-# Tab 3: 手動交易日記 (模擬)
+# Tab 3: 實驗室 (Placeholder)
 # ==========================================
-# ... (在 Tab 3 裡面)
 with tab3:
-    st.header("✍️ 手動模擬交易紀錄")
-    st.write("在這裡記錄你自己的模擬操作，系統會幫你計算損益。")
+    st.header("🤖 Alpha 實驗室")
+    st.info("🚧 開發中：這裡未來可以放置 Transformer 模型預測結果或是情緒分析指標。")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("市場情緒 (VIX)", "18.5", "-1.2%")
+    with c2:
+        st.metric("下週預測", "Bullish", "信心度 75%")
 
-    # 🔥【修正點】先確保 data 資料夾存在
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
+# ==========================================
+# Tab 4: 手動日記
+# ==========================================
+with tab4:
+    st.header("✍️ 手動模擬交易紀錄")
+    MANUAL_LOG_FILE = os.path.join(DATA_DIR, "manual_log.csv")
 
     # 確保手動日誌檔案存在
     if not os.path.exists(MANUAL_LOG_FILE):
@@ -134,46 +148,46 @@ with tab3:
 
     # 輸入區塊
     with st.expander("➕ 新增交易紀錄", expanded=True):
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            m_date = st.date_input("日期", datetime.date.today())
-            m_ticker = st.text_input("股票代號 (如 TSLA)").upper()
-        with c2:
-            m_action = st.selectbox("動作", ["BUY", "SELL"])
-            m_price = st.number_input("價格", min_value=0.0, step=0.01)
-        with c3:
-            m_shares = st.number_input("股數", min_value=0.0, step=0.1)
-            m_note = st.text_input("筆記 (選填)")
-        
-        if st.button("提交紀錄"):
-            if m_ticker and m_price > 0 and m_shares > 0:
-                new_record = {
-                    "Date": m_date,
-                    "Ticker": m_ticker,
-                    "Action": m_action,
-                    "Price": m_price,
-                    "Shares": m_shares,
-                    "Note": m_note
-                }
-                pd.DataFrame([new_record]).to_csv(MANUAL_LOG_FILE, mode='a', header=False, index=False)
-                st.success(f"已儲存：{m_action} {m_ticker}")
-                st.rerun() # 重新整理頁面顯示最新數據
-            else:
-                st.error("請填寫完整資訊")
+        with st.form("manual_entry"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                m_date = st.date_input("日期", datetime.date.today())
+                m_ticker = st.text_input("股票代號 (如 TSLA)").upper()
+            with c2:
+                m_action = st.selectbox("動作", ["BUY", "SELL"])
+                m_price = st.number_input("價格", min_value=0.0, step=0.01)
+            with c3:
+                m_shares = st.number_input("股數", min_value=0.0, step=0.1)
+                m_note = st.text_input("筆記 (選填)")
+            
+            submit_btn = st.form_submit_button("提交紀錄")
+            
+            if submit_btn:
+                if m_ticker and m_price > 0 and m_shares > 0:
+                    new_record = {
+                        "Date": m_date,
+                        "Ticker": m_ticker,
+                        "Action": m_action,
+                        "Price": m_price,
+                        "Shares": m_shares,
+                        "Note": m_note
+                    }
+                    # 讀取舊資料並附加新資料
+                    df_old = pd.read_csv(MANUAL_LOG_FILE)
+                    df_new = pd.concat([df_old, pd.DataFrame([new_record])], ignore_index=True)
+                    df_new.to_csv(MANUAL_LOG_FILE, index=False)
+                    st.success(f"已儲存：{m_action} {m_ticker}")
+                    st.rerun()
+                else:
+                    st.error("請填寫完整資訊 (代號、價格、股數)")
 
-    # 顯示紀錄與簡單統計
+    # 顯示紀錄
     if os.path.exists(MANUAL_LOG_FILE):
         df_manual = pd.read_csv(MANUAL_LOG_FILE)
-        
         if not df_manual.empty:
-            # 簡單損益計算 (示意)
-            total_invested = 0
-            realized_pnl = 0
-            
-            # 顯示表格
             st.subheader("交易明細")
             st.dataframe(df_manual.sort_index(ascending=False), use_container_width=True)
             
-            # 下載功能
+            # 下載按鈕
             csv = df_manual.to_csv(index=False).encode('utf-8')
             st.download_button("下載 CSV", csv, "my_trade_log.csv", "text/csv")
