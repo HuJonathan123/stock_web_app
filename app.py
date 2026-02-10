@@ -32,22 +32,30 @@ if not os.path.exists(DATA_DIR):
 with tab1:
     st.header("🦅 Vulture Strategy (自動化監控)")
     
-    # 讀取狀態
+    # 初始化預設值 (防止檔案讀取失敗)
+    portfolio = {"cash": 1000, "holdings": None, "last_update": "尚未更新"}
+    
+    # 嘗試讀取檔案
     if os.path.exists(PORTFOLIO_FILE):
-        with open(PORTFOLIO_FILE, 'r') as f:
-            portfolio = json.load(f)
-            
-        # 顯示指標卡片
-        col1, col2, col3 = st.columns(3)
-        
-        status_text = "無 (空手)"
-        if portfolio['holdings']:
-            h = portfolio['holdings']
-            status_text = f"{h['Ticker']} ({h['Shares']:.2f} 股)"
-        
-        col1.metric("當前持倉", status_text)
-        col2.metric("可用現金", f"${portfolio['cash']:.2f}")
-        col3.metric("最後更新", portfolio['last_update'])
+        try:
+            with open(PORTFOLIO_FILE, 'r') as f:
+                # 檢查檔案是否為空
+                if os.stat(PORTFOLIO_FILE).st_size > 0:
+                    portfolio = json.load(f)
+        except json.JSONDecodeError:
+            st.warning("⚠️ 投資組合檔案 (portfolio.json) 格式錯誤或為空，已使用預設值。")
+    
+    # 顯示指標卡片
+    col1, col2, col3 = st.columns(3)
+    
+    status_text = "無 (空手)"
+    if portfolio.get('holdings'): # 使用 .get 防止 KeyError
+        h = portfolio['holdings']
+        status_text = f"{h['Ticker']} ({h['Shares']:.2f} 股)"
+    
+    col1.metric("當前持倉", status_text)
+    col2.metric("可用現金", f"${portfolio['cash']:.2f}")
+    col3.metric("最後更新", portfolio.get('last_update', '未知'))
 
     # 讀取交易日誌
     if os.path.exists(LOG_FILE):
