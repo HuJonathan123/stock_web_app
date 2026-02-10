@@ -245,3 +245,12 @@ def send_email_notification(strategies_to_check):
             print(f"❌ Email 發送失敗: {e}")
     else:
         print(f"💤 今日 ({today_str}) 無新交易，不打擾。")
+
+
+check_list = {
+    "🦅 經典禿鷹": os.path.join(DATA_DIR, "vulture_log.csv"),
+    "🚀 超級禿鷹": os.path.join(DATA_DIR, "super_vulture_2025_now_log.csv")
+}
+
+# 執行寄信檢查 (這一行最重要！沒有它，函數就不會動)
+send_email_notification(check_list)
