@@ -62,8 +62,11 @@ with tab1:
     if os.path.exists(LOG_FILE):
         df_log = pd.read_csv(LOG_FILE)
         if not df_log.empty:
-            st.subheader("📜 歷史交易 (自 2026-01-01 起)")
+            # 🔥 修改這裡：把 2026 改成 2025
+            st.subheader("📜 歷史交易 (自 2025-01-01 起)") 
+            
             st.dataframe(
+                df_log.sort_index(ascending=False),
                 df_log.sort_index(ascending=False), 
                 use_container_width=True,
                 column_config={
