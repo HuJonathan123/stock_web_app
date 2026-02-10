@@ -6,26 +6,25 @@ import datetime
 
 # 設定頁面
 st.set_page_config(page_title="AI 投資戰情室", layout="wide", page_icon="📈")
-
-# 標題
 st.title("📈 Jonathan's AI Investment Dashboard")
 
-# 建立三個頁籤
+# 建立分頁
 tab1, tab2, tab3 = st.tabs(["🦅 禿鷹策略 (自動)", "🤖 實驗室模型", "✍️ 手動交易日記"])
 
-# ... (上面的 import 都不變)
+# 🔥🔥🔥【修正核心：使用絕對路徑】🔥🔥🔥
+# 1. 抓出 app.py 所在的絕對位置
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 路徑設定
-DATA_DIR = "data"
+# 2. 設定 data 資料夾的絕對路徑
+DATA_DIR = os.path.join(BASE_DIR, "data")
 PORTFOLIO_FILE = os.path.join(DATA_DIR, "portfolio.json")
 LOG_FILE = os.path.join(DATA_DIR, "trade_log.csv")
 MANUAL_LOG_FILE = os.path.join(DATA_DIR, "manual_log.csv")
 
-# 🔥🔥🔥【請加入這段關鍵代碼】🔥🔥🔥
-# 檢查 data 資料夾是否存在，不存在就建立它
+# 3. 強制建立資料夾 (如果不存在)
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
-# 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+# 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 
 # ==========================================
 # Tab 1: 禿鷹策略 (自動化)
