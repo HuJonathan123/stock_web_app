@@ -4,8 +4,28 @@ import json
 import os
 import datetime
 
+
 st.set_page_config(page_title="AI 投資戰情室", layout="wide", page_icon="📈")
 st.title("📈 Jonathan's AI Investment Dashboard")
+
+# ===========================
+# 🔥 新增：顯示最後更新時間
+# ===========================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+META_FILE = os.path.join(DATA_DIR, "meta.json")
+
+if os.path.exists(META_FILE):
+    try:
+        with open(META_FILE, 'r') as f:
+            meta = json.load(f)
+            update_time = meta.get("last_updated", "未知")
+            # 使用漂亮的 info 框框顯示
+            st.info(f"🕒 數據最後更新於：**{update_time}** (請確保每日執行腳本以獲取最新股價)")
+    except:
+        st.warning("⚠️ 無法讀取更新時間")
+else:
+    st.warning("⚠️ 尚未找到更新時間紀錄 (請重新執行 run_backtest.py)")
 
 tab1, tab2, tab3, tab4 = st.tabs(["🦅 禿鷹 (經典版)", "🚀 超級禿鷹 (進化版)", "🤖 實驗室", "✍️ 手動日記"])
 

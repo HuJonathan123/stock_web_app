@@ -166,3 +166,19 @@ for name, (start, end) in TEST_PERIODS.items():
     run_simulation("super", start, end, f"super_vulture_{name}")
 
 print("✅ 所有回測完成！")
+
+# ===========================
+# 4. 記錄最後更新時間 (新增功能)
+# ===========================
+import datetime
+
+# 取得現在時間 (你的 Mac 時間)
+now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+meta_info = {"last_updated": now}
+
+# 寫入 meta.json
+META_FILE = os.path.join(DATA_DIR, "meta.json")
+with open(META_FILE, 'w') as f:
+    json.dump(meta_info, f)
+
+print(f"✅ 所有回測完成！更新時間已記錄：{now}")
