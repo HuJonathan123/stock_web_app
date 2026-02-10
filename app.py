@@ -20,6 +20,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 PORTFOLIO_FILE = os.path.join(DATA_DIR, "portfolio.json")
 LOG_FILE = os.path.join(DATA_DIR, "trade_log.csv")
 MANUAL_LOG_FILE = os.path.join(DATA_DIR, "manual_log.csv")
+BALANCE_FILE = os.path.join(DATA_DIR, "balance_history.csv")
 
 # 3. 強制建立資料夾 (如果不存在)
 if not os.path.exists(DATA_DIR):
@@ -57,30 +58,43 @@ with tab1:
     col2.metric("可用現金", f"${portfolio['cash']:.2f}")
     col3.metric("最後更新", portfolio.get('last_update', '未知'))
 
-    # 讀取交易日誌
+    # 1. 顯示交易紀錄 (讀取 trade_log.csv)
     if os.path.exists(LOG_FILE):
         df_log = pd.read_csv(LOG_FILE)
         if not df_log.empty:
             st.subheader("📜 歷史交易 (自 2026-01-01 起)")
-            
-            # 讓表格更漂亮
             st.dataframe(
                 df_log.sort_index(ascending=False), 
                 use_container_width=True,
                 column_config={
                     "Price": st.column_config.NumberColumn(format="$%.2f"),
-                    "Balance": st.column_config.NumberColumn(format="$%.2f"),
+                    # Balance 欄位在表格裡顯示的是當時的餘額，沒問題
                 }
             )
+    
+    # 2. 顯示資產成長曲線 (🔥 修改這裡：讀取 balance_history.csv)
+    if os.path.exists(BALANCE_FILE):
+        df_bal = pd.read_csv(BALANCE_FILE)
+        if not df_bal.empty:
+            st.subheader("📈 資產成長曲線 (含未實現損益)")
             
-            # 畫圖
-            st.subheader("📈 資產成長曲線")
-            chart_data = df_log[['Date', 'Balance']].copy()
+            # 處理數據給圖表
+            chart_data = df_bal.copy()
             chart_data['Date'] = pd.to_datetime(chart_data['Date'])
             chart_data = chart_data.set_index('Date')
-            st.line_chart(chart_data)
-        else:
-            st.info("暫無交易紀錄。")
+            
+            # 畫圖
+            st.line_chart(chart_data['Equity'])
+            
+            # 顯示最新淨值
+            latest_val = df_bal.iloc[-1]['Equity']
+            roi = (latest_val - 1000) / 1000 * 100
+            
+            color = "green" if roi >= 0 else "red"
+            st.markdown(f"### 目前總資產淨值: **${latest_val:,.2f}** (:{color}[{roi:.2f}%])")
+
+    else:
+        st.info("暫無資產數據。")
 
     st.markdown("---")
     st.caption("策略邏輯：本金 $1000 | 每次手續費 $2 | RSI < 30 買入 | 獲利 > 20% 賣出")
