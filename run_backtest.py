@@ -182,3 +182,78 @@ with open(META_FILE, 'w') as f:
     json.dump(meta_info, f)
 
 print(f"✅ 所有回測完成！更新時間已記錄：{now}")
+
+
+# ===========================
+# 5. 自動寄信通知功能 (新增)
+# ===========================
+import smtplib
+from email.mime.text import MIMEText
+from email.header import Header
+
+def send_email_notification(strategies_to_check):
+    # 從 GitHub Secrets 讀取帳密 (如果本機沒設定環境變數，這段會跳過不執行)
+    gmail_user = os.environ.get("EMAIL_USER")
+    gmail_password = os.environ.get("EMAIL_PASSWORD")
+    
+    if not gmail_user or not gmail_password:
+        print("⚠️ 未偵測到 Email 設定，跳過寄信步驟。")
+        return
+
+    # 今天的日期 (回測的最後一天)
+    today_str = dates[-1].strftime("%Y-%m-%d")
+    
+    messages = []
+    
+    # 檢查每一個策略
+    for strategy_name, log_file in strategies_to_check.items():
+        if os.path.exists(log_file):
+            df = pd.read_csv(log_file)
+            if not df.empty:
+                # 取得最後一筆交易
+                last_trade = df.iloc[0] # 假設是倒序排列
+                
+                # 關鍵邏輯：如果「最後交易日」等於「今天」
+                if last_trade['Date'] == today_str:
+                    action = last_trade['Action']
+                    ticker = last_trade['Ticker']
+                    price = last_trade['Price']
+                    reason = last_trade['Reason']
+                    
+                    # 決定 Emoji
+                    emoji = "🚀" if action == "BUY" else "💰"
+                    if "止損" in str(reason): emoji = "🛑"
+                    
+                    msg = f"【{strategy_name}】{emoji} {action} {ticker} @ ${price}\n原因: {reason}\n"
+                    messages.append(msg)
+
+    # 如果有新消息，就寄信
+    if messages:
+        print("📧 發現今日新交易，正在發送 Email...")
+        email_content = "\n\n".join(messages)
+        email_content += f"\n\n查看詳情: https://stockwebapp-essdf5t57gpfu7xcqzxypx.streamlit.app/" # 這裡換成你的 Streamlit 網址
+        
+        msg = MIMEText(email_content, 'plain', 'utf-8')
+        msg['Subject'] = Header(f"🔔 股市快訊 ({today_str}) - 發現新交易", 'utf-8')
+        msg['From'] = gmail_user
+        msg['To'] = gmail_user # 寄給自己
+
+        try:
+            server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+            server.login(gmail_user, gmail_password)
+            server.send_message(msg)
+            server.quit()
+            print("✅ Email 發送成功！")
+        except Exception as e:
+            print(f"❌ Email 發送失敗: {e}")
+    else:
+        print(f"💤 今日 ({today_str}) 無新交易，不打擾。")
+
+# 設定要監控的策略檔案
+check_list = {
+    "🦅 經典禿鷹": os.path.join(DATA_DIR, "vulture_log.csv"),
+    "🚀 超級禿鷹": os.path.join(DATA_DIR, "super_vulture_2025_now_log.csv")
+}
+
+# 執行寄信檢查
+send_email_notification(check_list)
