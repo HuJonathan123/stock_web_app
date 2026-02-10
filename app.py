@@ -13,11 +13,19 @@ st.title("📈 Jonathan's AI Investment Dashboard")
 # 建立三個頁籤
 tab1, tab2, tab3 = st.tabs(["🦅 禿鷹策略 (自動)", "🤖 實驗室模型", "✍️ 手動交易日記"])
 
+# ... (上面的 import 都不變)
+
 # 路徑設定
 DATA_DIR = "data"
 PORTFOLIO_FILE = os.path.join(DATA_DIR, "portfolio.json")
 LOG_FILE = os.path.join(DATA_DIR, "trade_log.csv")
 MANUAL_LOG_FILE = os.path.join(DATA_DIR, "manual_log.csv")
+
+# 🔥🔥🔥【請加入這段關鍵代碼】🔥🔥🔥
+# 檢查 data 資料夾是否存在，不存在就建立它
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+# 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
 
 # ==========================================
 # Tab 1: 禿鷹策略 (自動化)
