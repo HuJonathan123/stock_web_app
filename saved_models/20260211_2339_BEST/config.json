@@ -1,0 +1,28 @@
+{
+    "LOOK_BACK": 60,
+    "PREDICT_DAYS": 10,
+    "TICKERS": [
+        "NVDA",
+        "TSLA",
+        "AMZN",
+        "MSFT",
+        "GOOGL",
+        "META",
+        "AAPL",
+        "AMD",
+        "INTC",
+        "QCOM",
+        "AVGO",
+        "MU",
+        "JPM",
+        "V",
+        "DIS",
+        "NFLX",
+        "COST",
+        "PEP",
+        "KO",
+        "JNJ"
+    ],
+    "MIN_ROI_THRESHOLD": 3.0,
+    "End_Date": "2026-02-11"
+}

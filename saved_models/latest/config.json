@@ -1,0 +1,27 @@
+{
+    "LOOK_BACK": 60,
+    "PREDICT_DAYS": 10,
+    "MIN_ROI_THRESHOLD": 8.0,
+    "TICKERS": [
+        "NVDA",
+        "TSLA",
+        "AMZN",
+        "MSFT",
+        "GOOGL",
+        "META",
+        "AAPL",
+        "AMD",
+        "INTC",
+        "QCOM",
+        "AVGO",
+        "MU",
+        "JPM",
+        "V",
+        "DIS",
+        "NFLX",
+        "COST",
+        "PEP",
+        "KO",
+        "JNJ"
+    ]
+}

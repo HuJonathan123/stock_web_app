@@ -1,0 +1,8 @@
+{
+    "LOOK_BACK": 60,
+    "PREDICT_DAYS": 10,
+    "MIN_ROI_THRESHOLD": 10,
+    "STOP_LOSS_PCT": 0.05,
+    "TRAILING_DROP_PCT": 0.06,
+    "End_Date": "2026-02-12"
+}
