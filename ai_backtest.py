@@ -11,26 +11,33 @@ import json
 import random
 
 # ===========================
-# ⚙️ 策略設定 (階梯式動態止盈版)
+# ⚙️ 策略設定 (趨勢濾網版 - 強勢股抱更久)
 # ===========================
 INITIAL_CASH = 1000
 START_DATE = "2025-01-01"
 END_DATE = datetime.datetime.now().strftime("%Y-%m-%d")
 
+# 💰 交易成本
+TRANSACTION_FEE = 2.0  
+
 # 1. 入選標準
-MIN_ROI_THRESHOLD = 8.0   
+MIN_ROI_THRESHOLD = 8.0 
 
 # 2. 基礎風控
 STOP_LOSS_PCT = 0.04      
 TIME_STOP_DAYS = 20       
 
-# 3. 階梯式動態止盈
-TRAILING_ACTIVATION = 0.05 
-TRAILING_DROP_PCT = 0.04   
+# 3. 🔥 動態趨勢止盈 (Trend Following Trailing)
+# 邏輯：如果股價在 EMA20 之上 (強勢)，容忍度放寬；在 EMA20 之下 (弱勢)，容忍度收緊。
 
-# 4. 暴利鎖定
-SUPER_PROFIT_PCT = 0.20    
-SUPER_DROP_PCT = 0.02      
+# 強勢模式 (Price > EMA20)
+STRONG_DROP_TOLERANCE = 0.05  # 強勢時，容忍回落 5% (不怕洗盤)
+
+# 弱勢模式 (Price < EMA20)
+WEAK_DROP_TOLERANCE = 0.025   # 弱勢時，回落 2.5% 就跑 (快跑)
+
+# 暴利模式 (獲利 > 20% 且跌破 EMA20 時才啟動超級鎖利)
+SUPER_PROFIT_PCT = 0.20
 
 # 其他參數
 LOOK_BACK = 60      
@@ -136,7 +143,6 @@ def predict_future_roi(ticker, current_date, full_data):
         return -999
 
 def save_system_state(run_id):
-    # 保存到 saved_models/latest (方便網頁讀取)
     save_path = os.path.join(MODEL_DIR, "latest")
     if not os.path.exists(save_path): os.makedirs(save_path)
     
@@ -160,8 +166,12 @@ def save_system_state(run_id):
         
     print(f"✅ 成功保存 {count} 個智能模型！")
 
+# ===========================
+# 2. 回測主程式
+# ===========================
 def run_backtest():
-    print(f"🚀 啟動回測...")
+    print(f"🚀 啟動回測 (趨勢濾網版 - 強者恆強)...")
+    
     full_data = {}
     download_start = (datetime.datetime.strptime(START_DATE, "%Y-%m-%d") - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
     
@@ -170,7 +180,10 @@ def run_backtest():
         try:
             df = yf.download(t, start=download_start, end=END_DATE, progress=False)
             if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-            if not df.empty: full_data[t] = df
+            if not df.empty: 
+                # 計算 EMA20
+                df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+                full_data[t] = df
         except: pass
 
     portfolio = {"cash": INITIAL_CASH, "holdings": None} 
@@ -186,44 +199,83 @@ def run_backtest():
         if idx % 10 == 0: print(f"📅 {date_str} ({idx}/{total_steps})", end='\r')
 
         market_prices = {}
+        market_emas = {}
+        
         for t in TICKERS:
             if t in full_data and current_date in full_data[t].index:
                 market_prices[t] = full_data[t].loc[current_date]['Close']
+                market_emas[t] = full_data[t].loc[current_date]['EMA20']
         
         if not market_prices: continue
         
-        # 賣出檢查
+        # --- 賣出檢查 ---
         if portfolio["holdings"]:
             h = portfolio["holdings"]
             ticker = h["Ticker"]
             if ticker in market_prices:
                 curr_price = market_prices[ticker]
+                ema20 = market_emas[ticker]
+                
                 if curr_price > h["Highest"]: h["Highest"] = curr_price
                 
                 entry_price = h["Entry"]
                 highest_price = h["Highest"]
+                
                 pnl_pct = (curr_price - entry_price) / entry_price
                 max_pnl_pct = (highest_price - entry_price) / entry_price
                 drop_from_peak = (curr_price - highest_price) / highest_price
                 held_days = (current_date - h["BuyDate"]).days
                 
                 sell_reason = None
-                if pnl_pct <= -STOP_LOSS_PCT: sell_reason = f"🛑 止損 ({pnl_pct*100:.1f}%)"
-                elif max_pnl_pct >= SUPER_PROFIT_PCT and drop_from_peak <= -SUPER_DROP_PCT: sell_reason = f"🏆 暴利鎖定 ({drop_from_peak*100:.1f}%)"
-                elif max_pnl_pct >= TRAILING_ACTIVATION and drop_from_peak <= -TRAILING_DROP_PCT: sell_reason = f"📉 波段止盈 ({drop_from_peak*100:.1f}%)"
-                elif held_days >= TIME_STOP_DAYS: 
+                
+                # 判斷趨勢強度
+                is_strong = curr_price > ema20
+                
+                # 1. 止損
+                if pnl_pct <= -STOP_LOSS_PCT: 
+                    sell_reason = f"🛑 止損 ({pnl_pct*100:.1f}%)"
+                
+                # 2. 🔥 趨勢動態止盈
+                else:
+                    if is_strong:
+                        # 強勢股：容忍回落 5% (避免被洗)
+                        if drop_from_peak <= -STRONG_DROP_TOLERANCE:
+                            sell_reason = f"📉 強勢回調止盈 (回落 {drop_from_peak*100:.1f}%)"
+                    else:
+                        # 弱勢股：容忍回落 2.5% (快跑)
+                        if drop_from_peak <= -WEAK_DROP_TOLERANCE:
+                            sell_reason = f"🏃 弱勢反彈止盈 (回落 {drop_from_peak*100:.1f}%)"
+                
+                # 3. 時間到期
+                if not sell_reason and held_days >= TIME_STOP_DAYS: 
                     if pnl_pct > 0: sell_reason = f"⏰ 到期獲利 (+{pnl_pct*100:.1f}%)"
                     else: sell_reason = f"⏰ 到期平倉 ({pnl_pct*100:.1f}%)"
                 
                 if sell_reason:
-                    revenue = h["Shares"] * curr_price
-                    portfolio["cash"] = revenue
+                    # 執行賣出 (扣手續費)
+                    gross_revenue = h["Shares"] * curr_price
+                    net_revenue = gross_revenue - TRANSACTION_FEE
+                    
+                    buy_cost_total = (h["Shares"] * h["Entry"]) + TRANSACTION_FEE
+                    net_profit = net_revenue - buy_cost_total
+                    net_profit_pct = (net_profit / buy_cost_total) * 100
+                    
+                    portfolio["cash"] = net_revenue
                     portfolio["holdings"] = None
-                    trade_log.append({"Date": date_str, "Action": "SELL", "Ticker": ticker, "Price": curr_price, "Reason": sell_reason, "Balance": revenue})
-                    print(f"\n[{date_str}] 賣出 {ticker}: {sell_reason} | 餘額: {revenue:.0f}")
+                    
+                    trade_log.append({
+                        "Date": date_str, "Action": "SELL", "Ticker": ticker, "Price": curr_price, 
+                        "Reason": sell_reason, "Profit_USD": net_profit, "Profit_Pct": net_profit_pct, "Balance": net_revenue
+                    })
+                    
+                    profit_emoji = "🟢" if net_profit > 0 else "🔴"
+                    trend_tag = "🔥" if is_strong else "❄️"
+                    print(f"\n[{date_str}] 賣出 {ticker} {trend_tag}: {sell_reason}")
+                    print(f"   └── {profit_emoji} 淨損益: ${net_profit:.2f} ({net_profit_pct:.2f}%) | 目前資產: ${net_revenue:.2f}")
+                    
                     next_trade_date = current_date
 
-        # 買入檢查
+        # --- 買入檢查 ---
         if portfolio["holdings"] is None and current_date >= next_trade_date:
             best_ticker, best_roi = None, -999
             for t in TICKERS:
@@ -233,28 +285,38 @@ def run_backtest():
             
             if best_roi > MIN_ROI_THRESHOLD and best_ticker:
                 buy_price = market_prices[best_ticker]
-                shares = portfolio["cash"] / buy_price
-                portfolio["holdings"] = {"Ticker": best_ticker, "Shares": shares, "Entry": buy_price, "Highest": buy_price, "BuyDate": current_date}
-                portfolio["cash"] = 0
-                trade_log.append({"Date": date_str, "Action": "BUY", "Ticker": best_ticker, "Price": buy_price, "Reason": f"AI信心 {best_roi:.1f}%", "Balance": 0})
-                print(f"\n[{date_str}] 🚀 買入 {best_ticker} (預測 +{best_roi:.1f}%)")
+                available_cash = portfolio["cash"] - TRANSACTION_FEE
+                
+                if available_cash > 0:
+                    shares = available_cash / buy_price
+                    portfolio["holdings"] = {"Ticker": best_ticker, "Shares": shares, "Entry": buy_price, "Highest": buy_price, "BuyDate": current_date}
+                    portfolio["cash"] = 0
+                    
+                    trade_log.append({
+                        "Date": date_str, "Action": "BUY", "Ticker": best_ticker, "Price": buy_price, 
+                        "Reason": f"AI信心 {best_roi:.1f}%", "Profit_USD": 0, "Profit_Pct": 0, "Balance": 0
+                    })
+                    print(f"\n[{date_str}] 🚀 買入 {best_ticker} (預測 +{best_roi:.1f}%) | 成本: ${buy_price:.2f}")
+                else:
+                    print(f"\n[{date_str}] ⚠️ 資金不足")
             else:
                 next_trade_date = current_date + datetime.timedelta(days=2) 
 
+        # --- 記錄 ---
         equity = portfolio["cash"]
         if portfolio["holdings"]:
             if portfolio["holdings"]["Ticker"] in market_prices:
                 equity = portfolio["holdings"]["Shares"] * market_prices[portfolio["holdings"]["Ticker"]]
         balance_history.append({"Date": date_str, "Equity": equity})
 
+    # --- 結算 ---
     run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M")
     final_equity = balance_history[-1]['Equity']
     print(f"\n🏁 最終資產: ${final_equity:.2f} | 總報酬: {(final_equity - INITIAL_CASH) / INITIAL_CASH * 100:.1f}%")
     
-    # 存檔供網頁使用
     pd.DataFrame(trade_log).to_csv(os.path.join(DATA_DIR, "ai_backtest_log.csv"), index=False)
     pd.DataFrame(balance_history).to_csv(os.path.join(DATA_DIR, "ai_backtest_balance.csv"), index=False)
-    save_system_state(run_id) # 同時保存到 latest
+    save_system_state(run_id) 
 
 if __name__ == "__main__":
     run_backtest()
