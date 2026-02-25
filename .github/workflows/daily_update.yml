@@ -9,12 +9,12 @@ on:
 jobs:
   update-data:
     runs-on: ubuntu-latest
-    # 🔥 環境變數：隱藏 GPU 警告，並將你的 GitHub Secrets 傳入 Python 讓寄信功能可以運作！
+    # 🔥 環境變數：
     env:
       TF_CPP_MIN_LOG_LEVEL: '3'
       CUDA_VISIBLE_DEVICES: '-1'
-      EMAIL_USER: ${{ secrets.hujohnnetha@gmail.com }}
-      EMAIL_PASSWORD: ${{ secrets.srzxywqroexuijvm }}
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
 
     steps:
     - name: Checkout repository
