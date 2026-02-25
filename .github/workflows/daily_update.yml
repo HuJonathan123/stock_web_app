@@ -1,15 +1,14 @@
-name: Daily Stock Data Update
+name: Daily AI Stock Update
 
 on:
   schedule:
-    - cron: '0 22 * * *'  # 每天 UTC 22:00 (台灣時間 06:00)
-  workflow_dispatch:      # 允許手動執行
-
-permissions:
-  contents: write
+    # 設定時間：每天 UTC 時間 22:30 執行 (大約是美東時間下午 5:30 收盤後，台灣時間早上 6:30)
+    # 1-5 代表週一到週五執行
+    - cron: '30 22 * * 1-5'
+  workflow_dispatch: # 允許你在 GitHub 網頁上手動點擊執行測試
 
 jobs:
-  update_data:
+  update-data:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,23 +18,32 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.9' # 設定 Python 版本
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pandas yfinance streamlit
+        pip install -r requirements.txt
 
-    # 4. 執行回測腳本 (這會生成新數據和更新時間)
-    - name: Run Backtest Script
-      env:  # 🔥 新增這兩行，把密碼傳進去
-        EMAIL_USER: ${{ secrets.HUJOHN }}
-        EMAIL_PASSWORD: ${{ secrets.Hu200301 }}
-      run: python run_backtest.py
-
-    - name: Commit and push if changes
+    - name: Run Market Scanner & Backtests
       run: |
-        git config --global user.name 'GitHub Actions Bot'
-        git config --global user.email 'actions@github.com'
-        git add data/*.csv data/*.json
-        git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Daily auto-update data" && git push)
+        # 1. 更新 Tab 3 & 4 的最新 AI 掃描名單
+        python ai_market_scanner.py
+        
+        # 2. 如果你有每天更新 Tab 1 & Tab 2 (經典禿鷹) 的腳本，請在這裡加入
+        # 例如：python run_vulture_strategies.py
+        
+        # 3. 執行策略回測 (更新資金曲線 CSV)
+        # 注意：如果回測要跑很久(超過15分鐘)，建議不要每天跑，或只讓它計算當天最新淨值
+        python ai_backtest_2.py
+        python ai_backtest_ma30_2.py
+
+    - name: Commit and Push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        # 只把 data 資料夾底下的變更加入
+        git add data/
+        # 如果因為沒開市導致數據沒變，就不會報錯
+        git commit -m "🤖 Auto-update daily stock data" || exit 0
+        git push

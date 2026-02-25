@@ -1,0 +1,13 @@
+{
+    "scan_time": "2026-02-25 20:41:15",
+    "market_bullish": false,
+    "strategy_1_top3": [
+        {
+            "ticker": "MU",
+            "price": 418.01,
+            "probability": 91.6,
+            "ma30_distance": 5.7
+        }
+    ],
+    "strategy_2_ma30": []
+}

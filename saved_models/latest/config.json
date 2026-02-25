@@ -1,7 +1,7 @@
 {
     "LOOK_BACK": 60,
     "PREDICT_DAYS": 10,
-    "MIN_ROI_THRESHOLD": 8.0,
+    "MIN_ROI_THRESHOLD": 0,
     "TICKERS": [
         "NVDA",
         "TSLA",

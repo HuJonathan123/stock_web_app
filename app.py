@@ -3,11 +3,19 @@ import pandas as pd
 import json
 import os
 import datetime
+import subprocess
 
 st.set_page_config(page_title="AI 投資戰情室", layout="wide", page_icon="📈")
 st.title("📈 Jonathan's AI Investment Dashboard")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🦅 禿鷹 (經典版)", "🚀 超級禿鷹 (進化版)", "🤖 實驗室", "✍️ 手動日記"])
+# 重新定義 Tabs
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🦅 禿鷹 (經典版)", 
+    "🚀 超級禿鷹 (進化版)", 
+    "🏆 AI 領頭羊 (Top 3)", 
+    "💥 AI MA30 突破", 
+    "✍️ 手動日記"
+])
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -19,6 +27,14 @@ PERIOD_OPTIONS = {
     "2024 (AI 牛市)": "2024_bull",
     "2023 (震盪復甦)": "2023_recovery",
     "2022 (崩盤熊市)": "2022_bear"
+}
+
+# 共用 Dataframe 顯示格式
+DF_CONFIG = {
+    "ticker": st.column_config.TextColumn("股票代號"),
+    "price": st.column_config.NumberColumn("現價", format="$%.2f"),
+    "probability": st.column_config.ProgressColumn("AI 勝率", format="%.1f%%", min_value=0, max_value=100),
+    "ma30_distance": st.column_config.NumberColumn("乖離 MA30", format="%+.1f%%")
 }
 
 # ==========================================
@@ -50,7 +66,9 @@ def render_strategy_view(strategy_prefix, strategy_title, strategy_desc):
             df = df.set_index('Date')
             
             final_eq = df.iloc[-1]['Equity']
-            roi = (final_eq - 1000) / 1000 * 100
+            # AI 策略的初始資金是 10000，其他是 1000，這裡做個簡單判斷
+            init_cash = 10000 if "ai" in strategy_prefix else 1000
+            roi = (final_eq - init_cash) / init_cash * 100
             
             color = "green" if roi >= 0 else "red"
             emoji = "🎉" if roi >= 0 else "🩸"
@@ -83,6 +101,29 @@ def render_strategy_view(strategy_prefix, strategy_title, strategy_desc):
             st.info("無交易紀錄。")
 
 # ==========================================
+# 載入最新的 AI 掃描結果
+# ==========================================
+ai_signals = {}
+market_status = None
+scan_time = "尚未掃描"
+
+LATEST_SIGNALS_FILE = os.path.join(DATA_DIR, "latest_signals.json")
+if os.path.exists(LATEST_SIGNALS_FILE):
+    with open(LATEST_SIGNALS_FILE, 'r') as f:
+        ai_signals = json.load(f)
+        market_status = ai_signals.get('market_bullish')
+        scan_time = ai_signals.get('scan_time', 'N/A')
+
+def display_market_status():
+    st.write(f"📅 **最後掃描時間:** `{scan_time}`")
+    if market_status is True:
+        st.success("🟢 **大盤狀態：多頭 (QQQ > EMA60)** - 大環境安全，可積極建倉！")
+    elif market_status is False:
+        st.error("🔴 **大盤狀態：空頭 (QQQ < EMA60)** - 系統性風險高，建議空手或極輕倉防守！")
+    else:
+        st.warning("⚪️ **大盤狀態：未知** - 請先執行市場掃描。")
+
+# ==========================================
 # Tab 1: 經典禿鷹
 # ==========================================
 with tab1:
@@ -103,68 +144,109 @@ with tab2:
     )
 
 # ==========================================
-# Tab 3: AI 實驗室
+# Tab 3: AI 領頭羊戰法 (策略 1)
 # ==========================================
 with tab3:
-    st.header("🧠 AI 趨勢預測 (基於 $3008 獲利模型)")
+    st.header("🏆 AI 領頭羊戰法 (Top 3 Momentum)")
+    st.caption("【核心邏輯】只買全市場動能最強的前三名，並由 AI 確認勝率。無限奔跑不設止盈。")
     
-    # 1. 觸發按鈕
-    if st.button("⚡️ 執行最新預測 (Run Prediction)"):
-        with st.spinner("正在載入模型並分析最新股價..."):
-            import subprocess
-            subprocess.run(["python", "ai_predict.py"])
-        st.success("更新完成！")
-        st.rerun()
-
-    # 2. 顯示最新預測
-    AI_RES = os.path.join(DATA_DIR, "ai_lab_result.json")
-    if os.path.exists(AI_RES):
-        with open(AI_RES, 'r') as f:
-            res = json.load(f)
-        
-        st.write(f"📅 分析日期: {res.get('analysis_date', 'N/A')}")
-        
-        # 最佳推薦
-        top = res.get('top_pick')
-        if top:
-            col1, col2, col3 = st.columns(3)
-            col1.metric("🌟 明日首選", top['Ticker'])
-            col2.metric("預測漲幅", f"{top['ROI']:.2f}%")
-            col3.metric("目標價", f"${top['Predicted_High']:.2f}")
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("⚡️ 執行掃描", key="btn_scan_1"):
+            with st.spinner("正在掃描市場..."):
+                subprocess.run(["python", "ai_market_scanner.py"])
+            st.rerun()
             
-            # 畫圖
-            chart_data = top['History_Curve'] + top['Forecast_Curve']
-            st.line_chart(chart_data)
-            st.caption(f"圖表說明: 前段為過去 60 天走勢，後段為未來 10 天預測")
-
-        # 排行榜
-        st.subheader("📊 候選清單 (按漲幅排序)")
-        ranks = pd.DataFrame(res['all_rankings'])
-        if not ranks.empty:
-            st.dataframe(ranks[['Ticker', 'Current_Price', 'Predicted_High', 'ROI']], use_container_width=True)
-
-    # 3. 顯示回測績效
+    display_market_status()
     st.divider()
-    st.subheader("📜 策略歷史績效 (2025-Now)")
-    BT_LOG = os.path.join(DATA_DIR, "ai_backtest_log.csv")
-    BT_BAL = os.path.join(DATA_DIR, "ai_backtest_balance.csv")
     
-    if os.path.exists(BT_BAL):
-        df_bal = pd.read_csv(BT_BAL)
-        final_equity = df_bal.iloc[-1]['Equity']
-        roi = (final_equity - 1000) / 1000 * 100
+    st.subheader("🎯 今日推薦清單")
+    s1_data = ai_signals.get('strategy_1_top3', [])
+    if s1_data:
+        st.dataframe(pd.DataFrame(s1_data), use_container_width=True, column_config=DF_CONFIG, hide_index=True)
+    else:
+        st.info("今日無符合條件的標的，AI 建議觀望。")
         
-        st.metric("回測總資產", f"${final_equity:.0f}", f"{roi:.1f}%")
-        st.line_chart(df_bal.set_index('Date')['Equity'])
-        
-        with st.expander("查看詳細交易紀錄"):
-            if os.path.exists(BT_LOG):
-                st.dataframe(pd.read_csv(BT_LOG), use_container_width=True)
+    st.divider()
+    # 這裡預設讀取 ai_backtest_2.py 產生的結果
+    # 注意：你需要確保你把 ai_backtest_2.py 產生的 csv 命名規則跟你的網頁一致
+    # 這裡為了展示，我直接寫死讀取 data/ai_backtest_balance.csv
+    st.subheader("📜 歷史回測績效 (Top 3 動能版)")
+    bt_bal_file = os.path.join(DATA_DIR, "ai_backtest_balance.csv")
+    bt_log_file = os.path.join(DATA_DIR, "ai_backtest_log.csv")
+    
+    if os.path.exists(bt_bal_file):
+        df_bal = pd.read_csv(bt_bal_file)
+        if not df_bal.empty:
+            df_bal['Date'] = pd.to_datetime(df_bal['Date'])
+            df_bal = df_bal.set_index('Date')
+            final_eq = df_bal.iloc[-1]['Equity']
+            roi = (final_eq - 10000) / 10000 * 100
+            
+            c1, c2 = st.columns(2)
+            c1.metric("回測總資產", f"${final_eq:,.2f}")
+            c2.metric("總報酬率", f"{roi:.1f}%")
+            st.line_chart(df_bal['Equity'])
+            
+            with st.expander("查看詳細交易紀錄"):
+                if os.path.exists(bt_log_file):
+                    st.dataframe(pd.read_csv(bt_log_file).sort_index(ascending=False), use_container_width=True)
+
 
 # ==========================================
-# Tab 4: 手動日記
+# Tab 4: AI MA30 突破戰法 (策略 2)
 # ==========================================
 with tab4:
+    st.header("💥 AI MA30 強力突破戰法")
+    st.caption("【核心邏輯】等待股價強勢突破 MA30 上方 5% 才進場，確認度高，動態收網止盈。")
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("⚡️ 執行掃描", key="btn_scan_2"):
+            with st.spinner("正在掃描市場..."):
+                subprocess.run(["python", "ai_market_scanner.py"])
+            st.rerun()
+            
+    display_market_status()
+    st.divider()
+    
+    st.subheader("🎯 今日推薦清單")
+    s2_data = ai_signals.get('strategy_2_ma30', [])
+    if s2_data:
+        st.dataframe(pd.DataFrame(s2_data), use_container_width=True, column_config=DF_CONFIG, hide_index=True)
+    else:
+        st.info("今日無符合條件的標的，尚未出現突破。")
+        
+    st.divider()
+    # 這裡你需要確保執行 ai_backtest_ma30_2.py 後，輸出的 CSV 檔名是什麼
+    # 假設你把它命名為 ai_backtest_ma30_balance.csv
+    st.subheader("📜 歷史回測績效 (MA30 突破版)")
+    bt_bal_file_ma30 = os.path.join(DATA_DIR, "ai_backtest_ma30_balance.csv") # 假設你的檔名
+    bt_log_file_ma30 = os.path.join(DATA_DIR, "ai_backtest_ma30_log.csv")     # 假設你的檔名
+    
+    if os.path.exists(bt_bal_file_ma30):
+        df_bal = pd.read_csv(bt_bal_file_ma30)
+        if not df_bal.empty:
+            df_bal['Date'] = pd.to_datetime(df_bal['Date'])
+            df_bal = df_bal.set_index('Date')
+            final_eq = df_bal.iloc[-1]['Equity']
+            roi = (final_eq - 10000) / 10000 * 100
+            
+            c1, c2 = st.columns(2)
+            c1.metric("回測總資產", f"${final_eq:,.2f}")
+            c2.metric("總報酬率", f"{roi:.1f}%")
+            st.line_chart(df_bal['Equity'])
+            
+            with st.expander("查看詳細交易紀錄"):
+                if os.path.exists(bt_log_file_ma30):
+                    st.dataframe(pd.read_csv(bt_log_file_ma30).sort_index(ascending=False), use_container_width=True)
+    else:
+        st.info(f"尚未找到 MA30 版本的歷史績效檔案 ({bt_bal_file_ma30})。請先執行回測程式並將結果輸出為此檔名。")
+
+# ==========================================
+# Tab 5: 手動日記
+# ==========================================
+with tab5:
     st.header("✍️ 手動模擬交易")
     MANUAL_LOG = os.path.join(DATA_DIR, "manual_log.csv")
     if not os.path.exists(MANUAL_LOG):
