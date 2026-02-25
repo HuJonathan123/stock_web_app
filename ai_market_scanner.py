@@ -65,8 +65,20 @@ def scan_market():
     start_date = (datetime.datetime.now() - datetime.timedelta(days=200)).strftime("%Y-%m-%d")
     
     # 2. 檢查大盤 (QQQ)
-    market_df = yf.download(MARKET_INDEX, start=start_date, progress=False)
-    if isinstance(market_df.columns, pd.MultiIndex): market_df.columns = market_df.columns.get_level_values(0)
+    # 🔥 [修改] 加入 auto_adjust=True 和 multi_level_index=False 讓格式更穩定
+    print(f"🔍 正在下載大盤數據 {MARKET_INDEX}...")
+    try:
+        market_df = yf.download(MARKET_INDEX, start=start_date, progress=False, auto_adjust=True, multi_level_index=False)
+    except Exception as e:
+        print(f"❌ 大盤下載發生例外錯誤: {e}")
+        return
+
+    # 🔥 [關鍵防呆] 如果下載結果為空，直接結束函數，避免後面計算指標時崩潰
+    if market_df.empty:
+        print(f"❌ 無法下載大盤數據 {MARKET_INDEX} (數據為空)。可能原因是 yfinance 需要更新或 Yahoo 阻擋。本次掃描終止。")
+        return
+        
+    # 如果下載成功，繼續執行
     market_df = add_technical_indicators(market_df)
     
     is_market_bullish = False
@@ -81,17 +93,24 @@ def scan_market():
     momentum_scores = []
     
     for t in TICKERS:
-        df = yf.download(t, start=start_date, progress=False)
-        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
-        if not df.empty and len(df) > LOOK_BACK + 20: # 確保數據長度足夠
-            df = add_technical_indicators(df)
-            full_data[t] = df
-            
-            # 計算動能分數
-            ema60 = df['EMA60'].iloc[-1]
-            if ema60 > 0:
-                score = df['Close'].iloc[-1] / ema60
-                momentum_scores.append((t, score))
+        try:
+            df = yf.download(t, start=start_date, progress=False, auto_adjust=True, multi_level_index=False)
+        except:
+            continue
+
+        # 🔥 [防呆] 確保數據不為空且長度足夠
+        if df.empty or len(df) < LOOK_BACK + 20: 
+            continue
+
+        df = add_technical_indicators(df)
+        full_data[t] = df
+        # ... (後面的代碼保持不變)
+        
+        # 計算動能分數
+        ema60 = df['EMA60'].iloc[-1]
+        if ema60 > 0:
+            score = df['Close'].iloc[-1] / ema60
+            momentum_scores.append((t, score))
 
     momentum_scores.sort(key=lambda x: x[1], reverse=True)
     top_3_tickers = [x[0] for x in momentum_scores[:3]]

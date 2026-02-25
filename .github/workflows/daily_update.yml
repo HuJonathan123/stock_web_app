@@ -2,14 +2,14 @@ name: Daily AI Stock Update
 
 on:
   schedule:
-    # 每天 UTC 時間 22:30 執行 (台灣時間早上 6:30)
+    # 每天 UTC 22:30 (台灣時間 06:30)
     - cron: '30 22 * * 1-5'
-  workflow_dispatch: # 允許手動點擊執行
+  workflow_dispatch:
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
-    # 🔥 環境變數：
+    # 🔥 設定全域環境變數，確保所有步驟都能讀取到 Secrets
     env:
       TF_CPP_MIN_LOG_LEVEL: '3'
       CUDA_VISIBLE_DEVICES: '-1'
@@ -28,27 +28,26 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        # 強制安裝所有必備套件，包含 ta
-        pip install ta --upgrade yfinance pandas numpy scikit-learn tensorflow-cpu streamlit
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # 🔥 [關鍵修正] 強制升級 yfinance 到最新版，解決 Yahoo 下載錯誤
+        # 加入 --no-cache-dir 確保不使用舊的快取
+        pip install --upgrade --no-cache-dir yfinance
+        # 安裝其他必要套件
+        pip install ta pandas numpy scikit-learn tensorflow-cpu streamlit
+        
+        # 顯示 yfinance 版本 (方便除錯)
+        pip show yfinance
 
     - name: Run Market Scanner & Backtests
       run: |
-        # ==========================================
-        # 🦅 更新 Tab 1 & Tab 2 (經典與超級禿鷹)
-        # ==========================================
-        python run_backtest.py
+        # 1. 跑禿鷹策略 (Tab 1 & 2)
+        python run_backtest.py || echo "run_backtest.py 執行失敗"
 
-        # ==========================================
-        # 🧠 更新 Tab 3 & 4 (每日最新 AI 推薦名單)
-        # ==========================================
-        python ai_market_scanner.py
+        # 2. 跑 AI 掃描 (Tab 3 & 4)
+        python ai_market_scanner.py || echo "ai_market_scanner.py 執行失敗"
         
-        # ==========================================
-        # 📜 更新 Tab 3 & 4 (歷史回測資產曲線)
-        # ==========================================
-        python ai_backtest_2.py
-        python ai_backtest_ma30_2.py
+        # 3. 跑 AI 歷史回測 (更新資金曲線)
+        python ai_backtest_2.py || echo "ai_backtest_2.py 執行失敗"
+        python ai_backtest_ma30_2.py || echo "ai_backtest_ma30_2.py 執行失敗"
 
     - name: Commit and Push changes
       run: |
