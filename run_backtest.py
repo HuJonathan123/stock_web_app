@@ -2,6 +2,7 @@ import pandas as pd
 import json
 import os
 import yfinance as yf
+import datetime # 確保引入 datetime
 
 # ===========================
 # 1. 全局設定
@@ -11,7 +12,9 @@ if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
 
 TICKERS = ['MSFT', 'GOOGL', 'AMZN', 'COST', 'PEP', 'KO', 'JPM', 'UNH', 'TSLA', 'NVDA', 'AMD', 'META', 'NFLX']
 DOWNLOAD_START = "2021-06-01"
-TODAY = "2026-02-11"
+
+# 🔥 [修改這裡] 讓它自動抓取程式執行當下的日期
+TODAY = datetime.datetime.now().strftime("%Y-%m-%d")
 
 print(f"📥 正在下載長歷史數據 ({DOWNLOAD_START} ~ {TODAY})...")
 data_cache = {}
@@ -27,7 +30,8 @@ TEST_PERIODS = {
     "2022_bear": ("2022-01-01", "2022-12-31"),      # 熊市
     "2023_recovery": ("2023-01-01", "2023-12-31"),  # 復甦
     "2024_bull": ("2024-01-01", "2024-12-31"),      # 牛市
-    "2025_now": ("2025-01-01", "2026-02-10")        # 現況
+    # 🔥 [修改這裡] 讓 2025_now 的結束日期永遠是今天
+    "2025_now": ("2025-01-01", TODAY)               # 現況
 }
 
 # ===========================

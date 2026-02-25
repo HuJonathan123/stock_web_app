@@ -2,14 +2,19 @@ name: Daily AI Stock Update
 
 on:
   schedule:
-    # 設定時間：每天 UTC 時間 22:30 執行 (大約是美東時間下午 5:30 收盤後，台灣時間早上 6:30)
-    # 1-5 代表週一到週五執行
+    # 每天 UTC 時間 22:30 執行 (台灣時間早上 6:30)
     - cron: '30 22 * * 1-5'
-  workflow_dispatch: # 允許你在 GitHub 網頁上手動點擊執行測試
+  workflow_dispatch: # 允許手動點擊執行
 
 jobs:
   update-data:
     runs-on: ubuntu-latest
+    # 🔥 環境變數：隱藏 GPU 警告，並將你的 GitHub Secrets 傳入 Python 讓寄信功能可以運作！
+    env:
+      TF_CPP_MIN_LOG_LEVEL: '3'
+      CUDA_VISIBLE_DEVICES: '-1'
+      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
 
     steps:
     - name: Checkout repository
@@ -18,23 +23,30 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9' # 設定 Python 版本
+        python-version: '3.9'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        # 強制安裝所有必備套件，包含 ta
+        pip install ta yfinance pandas numpy scikit-learn tensorflow-cpu streamlit
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
     - name: Run Market Scanner & Backtests
       run: |
-        # 1. 更新 Tab 3 & 4 的最新 AI 掃描名單
+        # ==========================================
+        # 🦅 更新 Tab 1 & Tab 2 (經典與超級禿鷹)
+        # ==========================================
+        python run_backtest.py
+
+        # ==========================================
+        # 🧠 更新 Tab 3 & 4 (每日最新 AI 推薦名單)
+        # ==========================================
         python ai_market_scanner.py
         
-        # 2. 如果你有每天更新 Tab 1 & Tab 2 (經典禿鷹) 的腳本，請在這裡加入
-        # 例如：python run_vulture_strategies.py
-        
-        # 3. 執行策略回測 (更新資金曲線 CSV)
-        # 注意：如果回測要跑很久(超過15分鐘)，建議不要每天跑，或只讓它計算當天最新淨值
+        # ==========================================
+        # 📜 更新 Tab 3 & 4 (歷史回測資產曲線)
+        # ==========================================
         python ai_backtest_2.py
         python ai_backtest_ma30_2.py
 
@@ -42,8 +54,6 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
-        # 只把 data 資料夾底下的變更加入
         git add data/
-        # 如果因為沒開市導致數據沒變，就不會報錯
         git commit -m "🤖 Auto-update daily stock data" || exit 0
         git push
