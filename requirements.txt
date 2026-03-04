@@ -7,3 +7,4 @@ scikit-learn
 tensorflow  # 如果你要跑 AI 模型
 joblib
 tensorflow-cpu
+ta

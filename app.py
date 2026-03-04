@@ -3,7 +3,6 @@ import pandas as pd
 import json
 import os
 import datetime
-import subprocess
 
 st.set_page_config(page_title="AI 投資戰情室", layout="wide", page_icon="📈")
 st.title("📈 Jonathan's AI Investment Dashboard")
@@ -121,7 +120,7 @@ def display_market_status():
     elif market_status is False:
         st.error("🔴 **大盤狀態：空頭 (QQQ < EMA60)** - 系統性風險高，建議空手或極輕倉防守！")
     else:
-        st.warning("⚪️ **大盤狀態：未知** - 請先執行市場掃描。")
+        st.warning("⚪️ **大盤狀態：未知** - 請先等待雲端每日自動掃描。")
 
 # ==========================================
 # Tab 1: 經典禿鷹
@@ -149,13 +148,6 @@ with tab2:
 with tab3:
     st.header("🏆 AI 領頭羊戰法 (Top 3 Momentum)")
     st.caption("【核心邏輯】只買全市場動能最強的前三名，並由 AI 確認勝率。無限奔跑不設止盈。")
-    
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("⚡️ 執行掃描", key="btn_scan_1"):
-            with st.spinner("正在掃描市場..."):
-                subprocess.run(["python", "ai_market_scanner.py"])
-            st.rerun()
             
     display_market_status()
     st.divider()
@@ -168,9 +160,6 @@ with tab3:
         st.info("今日無符合條件的標的，AI 建議觀望。")
         
     st.divider()
-    # 這裡預設讀取 ai_backtest_2.py 產生的結果
-    # 注意：你需要確保你把 ai_backtest_2.py 產生的 csv 命名規則跟你的網頁一致
-    # 這裡為了展示，我直接寫死讀取 data/ai_backtest_balance.csv
     st.subheader("📜 歷史回測績效 (Top 3 動能版)")
     bt_bal_file = os.path.join(DATA_DIR, "ai_backtest_balance.csv")
     bt_log_file = os.path.join(DATA_DIR, "ai_backtest_log.csv")
@@ -192,20 +181,12 @@ with tab3:
                 if os.path.exists(bt_log_file):
                     st.dataframe(pd.read_csv(bt_log_file).sort_index(ascending=False), use_container_width=True)
 
-
 # ==========================================
 # Tab 4: AI MA30 突破戰法 (策略 2)
 # ==========================================
 with tab4:
     st.header("💥 AI MA30 強力突破戰法")
     st.caption("【核心邏輯】等待股價強勢突破 MA30 上方 5% 才進場，確認度高，動態收網止盈。")
-    
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("⚡️ 執行掃描", key="btn_scan_2"):
-            with st.spinner("正在掃描市場..."):
-                subprocess.run(["python", "ai_market_scanner.py"])
-            st.rerun()
             
     display_market_status()
     st.divider()
@@ -218,11 +199,9 @@ with tab4:
         st.info("今日無符合條件的標的，尚未出現突破。")
         
     st.divider()
-    # 這裡你需要確保執行 ai_backtest_ma30_2.py 後，輸出的 CSV 檔名是什麼
-    # 假設你把它命名為 ai_backtest_ma30_balance.csv
     st.subheader("📜 歷史回測績效 (MA30 突破版)")
-    bt_bal_file_ma30 = os.path.join(DATA_DIR, "ai_backtest_ma30_balance.csv") # 假設你的檔名
-    bt_log_file_ma30 = os.path.join(DATA_DIR, "ai_backtest_ma30_log.csv")     # 假設你的檔名
+    bt_bal_file_ma30 = os.path.join(DATA_DIR, "ai_backtest_ma30_balance.csv") 
+    bt_log_file_ma30 = os.path.join(DATA_DIR, "ai_backtest_ma30_log.csv")     
     
     if os.path.exists(bt_bal_file_ma30):
         df_bal = pd.read_csv(bt_bal_file_ma30)

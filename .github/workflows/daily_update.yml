@@ -39,15 +39,15 @@ jobs:
 
     - name: Run Market Scanner & Backtests
       run: |
-        # 1. 跑禿鷹策略 (Tab 1 & 2)
+        # 1. 跑禿鷹策略 (更新 Tab 1 & 2 的推薦)
         python run_backtest.py || echo "run_backtest.py 執行失敗"
 
-        # 2. 跑 AI 掃描 (Tab 3 & 4)
+        # 2. 跑 AI 掃描 (更新 Tab 3 & 4 的今日推薦清單)
         python ai_market_scanner.py || echo "ai_market_scanner.py 執行失敗"
         
-        # 3. 跑 AI 歷史回測 (更新資金曲線)
-        python ai_backtest_2.py || echo "ai_backtest_2.py 執行失敗"
-        python ai_backtest_ma30_2.py || echo "ai_backtest_ma30_2.py 執行失敗"
+        # ⛔️ [已移除] 不再每天跑歷史回測，讓過去的回測數據固定不變！
+        # python ai_backtest_2.py 
+        # python ai_backtest_ma30_2.py
 
     - name: Commit and Push changes
       run: |
